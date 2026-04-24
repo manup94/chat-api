@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String
+  password  String
+  messagesSent   Message[] @relation("SentMessages")  // Mensajes enviados por el usuario
+  messagesReceived Message[] @relation("ReceivedMessages")  // Mensajes recibidos por el usuario
+  favorites Message[] @relation("FavoritedBy")  // Mensajes que el usuario ha marcado como favoritos
+  friendRequestsSent     FriendRequest[] @relation("FriendSender")
+  friendRequestsReceived FriendRequest[] @relation("FriendReceiver")
+}
+
+model FriendRequest {
+  id         String   @id @default(cuid())
+  senderId   String
+  receiverId String
+  status     Status   @default(PENDING)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  sender   User @relation("FriendSender", fields: [senderId], references: [id])
+  receiver User @relation("FriendReceiver", fields: [receiverId], references: [id])
+
+  @@unique([senderId, receiverId])
+}
+
+enum Status {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model Message {
+  id        String    @id @default(cuid())
+  content   String
+  senderId  String
+  receiverId String
+  timestamp DateTime  @default(now())
+  
+  sender    User      @relation("SentMessages", fields: [senderId], references: [id])
+  receiver  User      @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  
+  favoritedBy User[]  @relation("FavoritedBy")  // Relación de usuarios que han marcado el mensaje como favorito
+}
+
