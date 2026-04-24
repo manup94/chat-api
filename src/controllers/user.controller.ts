@@ -4,6 +4,10 @@ import { PrismaClient } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { Request, Response } from "express"
 import jwt from "jsonwebtoken"
+import { AUTH_COOKIE_NAME, getAuthCookieOptions, serializeSafeUser } from "@/lib/auth"
+
+const getPublicUser = (user: { id: string; email: string; name: string }) =>
+  serializeSafeUser(user)
 
 export const registerUser = async (
   req: Request,
@@ -34,11 +38,12 @@ export const registerUser = async (
     },
   })
 
-  // Crear JWT
   const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET as string, {
     expiresIn: "1h",
   })
-  res.json({ user, token })
+
+  res.cookie(AUTH_COOKIE_NAME, token, getAuthCookieOptions())
+  res.status(201).json({ user: getPublicUser(user) })
 }
 
 export const loginUser = async (
@@ -68,5 +73,9 @@ export const loginUser = async (
     expiresIn: "1h",
   })
 
-  res.json({ user, token })
+  res.cookie(AUTH_COOKIE_NAME, token, getAuthCookieOptions())
+  res.json({ 
+    user: getPublicUser(user),
+    token 
+  })
 }

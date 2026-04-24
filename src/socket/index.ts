@@ -4,6 +4,8 @@ import { PrismaClient } from "@prisma/client"
 import jwt from "jsonwebtoken"
 import { sendMessageSchema, SendMessageData } from "../models/validation-schemas/message.schema"
 import { areUsersFriends } from "../lib/friendship"
+import { isOriginAllowed } from "../lib/origins"
+import { getTokenFromHandshake } from "../lib/auth"
 
 interface CustomSocket extends Socket {
   userId?: string
@@ -12,7 +14,14 @@ interface CustomSocket extends Socket {
 export const socketInit = (server: HttpServer, prisma: PrismaClient) => {
   const io = new Server(server, {
     cors: {
-      origin: process.env.FRONTEND_URL || "http://localhost:3000",
+      origin: (origin, callback) => {
+        if (!origin || isOriginAllowed(origin)) {
+          callback(null, true)
+          return
+        }
+
+        callback(new Error(`Origin not allowed: ${origin}`))
+      },
       methods: ["GET", "POST"],
       credentials: true,
     },
@@ -20,19 +29,16 @@ export const socketInit = (server: HttpServer, prisma: PrismaClient) => {
 
   // Mapeo de userId a socketId
   const userSocketMap = new Map<string, string>()
+  const messageBuckets = new Map<string, { count: number; resetAt: number }>()
 
   // Middleware de autenticación
   io.use((socket: CustomSocket, next) => {
-    // Intentar obtener el token desde la cookie (típicamente llamada next-auth.session-token)
-    // Nota: socket.handshake.headers.cookie es un string con todas las cookies
-    const cookies = socket.handshake.headers.cookie;
-    
-    // Necesitaremos extraer el token manualmente o usar una librería como 'cookie'
-    // Por ahora, asumimos que el token es enviado en la cabecera auth o cookie
-    const token = socket.handshake.auth.token || 
-                  cookies?.split('; ').find(row => row.startsWith('next-auth.session-token='))?.split('=')[1];
-
-    console.log("Token detectado en handshake:", token ? "EXISTE" : "VACÍO");
+    const token =
+      socket.handshake.auth.token ||
+      getTokenFromHandshake({
+        authorization: socket.handshake.headers.authorization,
+        cookie: socket.handshake.headers.cookie,
+      })
 
     if (!token) {
       return next(new Error("Authentication error: Token missing"));
@@ -56,12 +62,23 @@ export const socketInit = (server: HttpServer, prisma: PrismaClient) => {
     userSocketMap.set(userId, socket.id)
 
     socket.on("sendMessage", async (data: SendMessageData) => {
-      console.log("Evento sendMessage recibido con datos:", data);
       try {
+        const bucketKey = socket.userId ?? socket.id
+        const now = Date.now()
+        const bucket = messageBuckets.get(bucketKey)
+        if (!bucket || bucket.resetAt <= now) {
+          messageBuckets.set(bucketKey, { count: 1, resetAt: now + 60_000 })
+        } else if (bucket.count >= 30) {
+          socket.emit("error", { message: "Too many messages. Slow down." })
+          return
+        } else {
+          bucket.count += 1
+          messageBuckets.set(bucketKey, bucket)
+        }
+
         // Validar datos con Zod
         const validation = sendMessageSchema.safeParse(data)
         if (!validation.success) {
-          console.error("Error de validación Zod:", validation.error.errors)
           socket.emit("error", { message: "Invalid message data", errors: validation.error.errors })
           return
         }
@@ -96,7 +113,6 @@ export const socketInit = (server: HttpServer, prisma: PrismaClient) => {
         socket.emit("messageSent", message)
 
       } catch (error) {
-        console.error("Error crítico procesando sendMessage:", error)
         socket.emit("error", { message: "Internal server error while sending message" })
       }
     })
