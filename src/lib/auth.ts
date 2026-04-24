@@ -1,6 +1,6 @@
 import { Request } from "express"
 
-export const AUTH_COOKIE_NAME = "next-auth.session-token"
+export const AUTH_COOKIE_NAME = "__Secure-next-auth.session-token"
 export const API_INTERNAL_HEADER = "x-internal-api-secret"
 
 const isProduction = process.env.NODE_ENV === "production"
