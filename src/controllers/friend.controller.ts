@@ -151,7 +151,8 @@ export const updateFriendRequest = async (req: Request, res: Response) => {
 }
 
 export const getFriends = async (req: Request, res: Response) => {
-  const userId = (req as any).user.id
+  const userId = (req as any).user.id;
+  console.log("getFriends: userId:", userId); // Log userId
 
   const friendships = await prisma.friendRequest.findMany({
     where: {
@@ -165,7 +166,9 @@ export const getFriends = async (req: Request, res: Response) => {
     orderBy: {
       updatedAt: "desc",
     },
-  })
+  });
+
+  console.log("getFriends: friendships found:", friendships); // Log friendships
 
   const uniqueFriends = new Map<string, {
     id: string
@@ -226,5 +229,7 @@ export const getFriends = async (req: Request, res: Response) => {
     })
   })
 
+  console.log("getFriends: uniqueFriends map size:", uniqueFriends.size); // Log uniqueFriends count
+  console.log("getFriends: returning friends:", Array.from(uniqueFriends.values())); // Log the final array
   res.json(Array.from(uniqueFriends.values()))
 }
