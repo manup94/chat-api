@@ -19,10 +19,20 @@ const prisma = new PrismaClient()
 
 app.use(
   cors({
-    origin: getAllowedOrigins(),
+    origin: (origin, callback) => {
+      const allowedOrigins = getAllowedOrigins()
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true)
+      } else {
+        console.warn(`CORS blocked for origin: ${origin}`)
+        callback(new Error("Not allowed by CORS"))
+      }
+    },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "x-internal-api-secret"],
     credentials: true,
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   })
 )
 app.use(express.json({ limit: "10kb" }))

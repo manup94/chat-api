@@ -5,6 +5,8 @@ import { hasAllowedOriginHeader } from "@/lib/origins"
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"])
 
 export const requireAllowedOrigin = (req: Request, res: Response, next: NextFunction) => {
+  // Permitir GET y otros métodos seguros sin validación estricta de origen/referer aquí,
+  // confiando en la configuración global de CORS para la seguridad del navegador.
   if (SAFE_METHODS.has(req.method)) {
     next()
     return
