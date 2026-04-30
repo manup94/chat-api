@@ -21,6 +21,7 @@ app.use(
   cors({
     origin: getAllowedOrigins(),
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-internal-api-secret"],
     credentials: true,
   })
 )
