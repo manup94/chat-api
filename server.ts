@@ -6,7 +6,7 @@ import { PrismaClient } from "@prisma/client"
 import createRouter from "./src/routes"
 import { socketInit } from "./src/socket"
 import { initCleanupTask } from "./src/tasks/cleanup"
-import { getAllowedOrigins } from "./src/lib/origins"
+import { isOriginAllowed } from "./src/lib/origins"
 
 dotenv.config()
 
@@ -20,8 +20,7 @@ const prisma = new PrismaClient()
 app.use(
   cors({
     origin: (origin, callback) => {
-      const allowedOrigins = getAllowedOrigins()
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || isOriginAllowed(origin)) {
         callback(null, true)
       } else {
         console.warn(`CORS blocked for origin: ${origin}`)
